@@ -1,0 +1,29 @@
+name: Build EquationCraft macOS App
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Compile and Build App Bundle
+      run: |
+        make build
+
+    - name: Create DMG Disk Image
+      run: |
+        # Package the .app bundle into a DMG disk image
+        hdiutil create -volname "EquationCraft" -srcfolder "EquationCraft.app" -ov -format UDZO "EquationCraft.dmg"
+
+    - name: Upload Compiled DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: EquationCraft-DMG
+        path: EquationCraft.dmg
