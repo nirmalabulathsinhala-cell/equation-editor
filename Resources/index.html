@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 120px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: transparent;
+            overflow: hidden;
+            user-select: none;
+            transition: color 0.2s ease;
+        }
+        
+        #preview-container {
+            text-align: center;
+            max-width: 100%;
+            overflow-x: auto;
+            /* Smooth transitions for high-end feel */
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        /* Render style overrides for MathJax SVG output */
+        mjx-container[jax="SVG"] {
+            direction: ltr;
+            display: inline-block;
+            line-height: 0;
+            margin: 0;
+            text-align: left;
+        }
+        
+        mjx-container[jax="SVG"] > svg {
+            vertical-align: middle;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* Custom coloring based on theme */
+        .theme-light {
+            color: #1c1c1e;
+        }
+        
+        .theme-light svg {
+            fill: #1c1c1e;
+        }
+        
+        .theme-dark {
+            color: #f2f2f7;
+        }
+        
+        .theme-dark svg {
+            fill: #f2f2f7;
+        }
+        
+        .error-message {
+            color: #ff453a;
+            font-size: 13px;
+            text-align: center;
+            font-family: monospace;
+            padding: 8px;
+            border-radius: 6px;
+            background-color: rgba(255, 69, 58, 0.1);
+        </style>
+    
+    <script>
+        // Pre-configure MathJax v3
+        window.MathJax = {
+            options: {
+                enableMenu: false // Hide the context menu to avoid distracting UI
+            },
+            svg: {
+                fontCache: 'local', // Crucial for standalone SVG export (embeds Glyphs)
+                scale: 1.15
+            },
+            startup: {
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                    console.log('MathJax is ready');
+                    window.webkit.messageHandlers.mathEngine.postMessage({ type: 'ready' });
+                }
+            }
+        };
+    </script>
+    <script id="MathJax-script" src="tex-svg.js"></script>
+</head>
+<body class="theme-light">
+    <div id="preview-container">
+        <!-- Math will render here -->
+        <span style="color: #8e8e93; font-size: 14px;">Enter an equation to preview...</span>
+    </div>
+
+    <script>
+        function renderMath(latexString, isDarkMode) {
+            const container = document.getElementById('preview-container');
+            
+            // Adjust theme classes
+            document.body.className = isDarkMode ? 'theme-dark' : 'theme-light';
+            
+            if (!latexString || latexString.trim() === "") {
+                container.innerHTML = `<span style="color: #8e8e93; font-size: 14px;">Enter an equation to preview...</span>`;
+                window.webkit.messageHandlers.mathEngine.postMessage({ type: 'svg', content: "" });
+                return;
+            }
+            
+            try {
+                // Generate SVG from LaTeX
+                // We wrap it in display math mode if not already
+                let tex = latexString.trim();
+                
+                const mathNode = MathJax.tex2svg(tex, { display: true });
+                const svgNode = mathNode.querySelector('svg');
+                
+                if (!svgNode) {
+                    throw new Error("Could not compile LaTeX");
+                }
+                
+                // Clear and render in WebView
+                container.innerHTML = "";
+                container.appendChild(mathNode);
+                
+                // Add styling to make SVG color match current theme
+                svgNode.setAttribute("fill", isDarkMode ? "#f2f2f7" : "#1c1c1e");
+                
+                // Extract clean, self-contained SVG XML
+                // Clone node to modify attributes specifically for export/clipboard
+                const exportSvg = svgNode.cloneNode(true);
+                // Ensure SVG has proper XML namespaces for Adobe Illustrator/Affinity
+                exportSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                // Remove internal styling that might conflict
+                exportSvg.removeAttribute("style");
+                
+                const svgString = exportSvg.outerHTML;
+                
+                // Send SVG back to macOS application host
+                window.webkit.messageHandlers.mathEngine.postMessage({ 
+                    type: 'svg', 
+                    content: svgString 
+                });
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+                window.webkit.messageHandlers.mathEngine.postMessage({ 
+                    type: 'error', 
+                    content: error.message 
+                });
+            }
+        }
+    </script>
+</body>
+</html>
