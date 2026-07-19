@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import WebKit
 
 struct ContentView: View {
     @State private var latexInput: String = "E = mc^2"
